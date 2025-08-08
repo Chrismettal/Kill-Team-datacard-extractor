@@ -8,18 +8,40 @@ import os
 import sys
 import argparse
 import glob
+import re
+from copy import deepcopy
 from pypdf import PdfWriter, PdfReader, Transformation, PaperSize
 from pypdf.generic import RectangleObject
-from pypdf.annotations import FreeText
-from datetime import date
 
 #############################################################################
 ##                           Global variables                              ##
 #############################################################################
-input_path          = ""
-output_path         = ""
-today               = date.today().strftime("%Y-%m-%d")
-output_files        = "kt3extracts_" + today
+input_path: str
+output_format: str
+horizontal_range: str
+vertical_range: str
+
+#############################################################################
+##                           Global constants                              ##
+#############################################################################
+CARDHEIGHT  = 340.1575
+CARDWIDTH   = 198.4252
+PADDING     = 10
+CROPS       = [
+    [
+    (127, 620, 468, 817), # Horizontal Line 1
+    (127, 421, 468, 618), # Horizontal Line 2
+    (127, 223, 468, 420), # Horizontal Line 3
+    (127, 24, 468, 221)  # Horizontal Line 4
+    ],
+    [
+    (50, 50, 400, 400), # Vertical Top Left
+    (50, 50, 400, 400), # Vertical Top Right
+    (50, 50, 400, 400), # Vertical Bottom Left
+    (50, 50, 400, 400)  # Vertical Bottom Right
+    ]
+#   (XBL, ZBL, XTR, ZTR)
+]
 
 #############################################################################
 ##                               Helpers                                   ##
@@ -30,264 +52,175 @@ def argset():
     Sets command line arguments
     """
     global input_path
-    global output_path
-    global output_files
+    global output_format
+    global horizontal_range
+    global vertical_range
 
     parser = argparse.ArgumentParser(description=
-        "Command line tool to consolidate several DHL labels for printing with less waste")
+        "Command line tool to extract Kill Team 3rd edition datacards from free rules downloads")
 
+    # Horizontal range
+    parser.add_argument(
+        '-hr', '--horizontal', 
+        default="",
+        type=str,
+        help="""
+            Range of pages with horizontal datacards
+            "1-2"
+            """
+    )
+
+    # Vertical range
+    parser.add_argument(
+        '-vr', '--vertical', 
+        default="",
+        type=str,
+        help="""
+            Range of pages with vertical datacards
+            "3-4"
+            """
+    )
+    
     # Input path
-    parser.add_argument('input_path', nargs='?', 
-        default=os.getcwd(), 
+    parser.add_argument(
+        '-input_path', '-i',
+        type=str,
         help="""
-            Path to input PDFs. Will use current directory if ommited
-            """)
+            Path to input PDF.
+            """
+    )
 
-    # Output path
-    parser.add_argument('output_path', nargs='?', 
-        default=os.getcwd(),
+    # Output Format
+    parser.add_argument(
+        '--output_format', '-o',
+        default="png",
+        type=str,
         help="""
-            Path of output PDF and CSV. Will use 
-            current directory if ommited
-            """)
+            Format of output file.
+            Available Options:
+            png, pdf
+            """
+    )
 
     # Parse args
     args = parser.parse_args()
     input_path  = args.input_path
-    output_path = args.output_path
+    output_format = args.output_format
+    horizontal_range = args.horizontal
+    vertical_range = args.vertical
 
-    # Output recognized args
-    print("Using input path:")
-    print(input_path)
-    print("Using output path:")
-    print(output_path)
-    print("---")
-
-    # Argument sanity checks
-    if not os.path.isdir(input_path):
-        print("The input path specified does not exist, exiting")
-        sys.exit()
-    if not os.path.isdir(output_path):
-        print("The output path specified does not exist, exiting")
+    # Test for ranges to be valid
+    pattern = r'^\d+-\d+$'
+    if not re.match(pattern, horizontal_range) or not re.match(pattern, vertical_range):
+        print("Ranges entered invalid, please format them like '1-2'")
         sys.exit()
 
-    # Assemble output file path without file extension
-    output_files = os.path.join(output_path, output_files)
+    # Test if input file is valid
+    if not input_path.lower().endswith('.pdf'):
+        print("File does not seem to be a pdf file")
+        sys.exit()
+    if not os.path.isfile(input_path):
+        print("Input file does not seem to be a file at all")
+        sys.exit()
+
+    # Test if a valid output was set
+    if not output_format == "pdf" and not output_format == "png":
+        print("File format chosen does not match either pdf or png")
+        sys.exit()
 
 
-def read_file_list(input_path):
+def read_file():
     """
-    Read in files from input_path 
+    Read in and split file
     """
-    file_path_list = glob.glob(input_path + os.path.sep + "*.pdf")
+    global input_path
+    global output_format
+    global horizontal_range
+    global vertical_range
 
-    return(file_path_list)
-
-
-def splice_files(file_path_list, output_files):
-    """
-    Create consolidated pdf
-    """
-    global today
-    currentPage = 0
-    national_file_path_list      = []
-    international_file_path_list = []
-
+    # Prepare reader and writer
+    reader = PdfReader(input_path)
     writer = PdfWriter()
 
-    # Split into national / international labels by page count 
-    # (Only international orders have the CN22/CN23 as a second page)
-    for inputFile in file_path_list:
-        reader = PdfReader(inputFile)
+    # Get page ranges
+    horirange =  [int(num) for num in horizontal_range.split('-')]
+    verirange =  [int(num) for num in vertical_range.split('-')]
+    pageranges = [horirange, verirange]
 
-        if len(reader.pages) > 1:
-            international_file_path_list.append(inputFile)
-        else:
-            national_file_path_list.append(inputFile)
-
-    # Loop through international labels
-    for inputFile in international_file_path_list:
-
-        # Create and load readers/writers
-        reader = PdfReader(inputFile)
-
-        # Get recipient name from filename
-        inputFileSplit = os.path.basename(inputFile).split("_")
-        recipient = inputFileSplit[2] + " " + inputFileSplit[3].split(".")[0]
-
-        # Collect pages
-        pageAdress  = reader.pages[1]
-        pageCN      = reader.pages[0]
-
-        # Find tracking number in pdf text
-        extractedText       = pageAdress.extract_text((0, 90))
-        sendungsNummerPos   = extractedText.find("Sendungsnr.:")
-        rightHalfText       = extractedText[sendungsNummerPos+13:]
-        newLinePos          = rightHalfText.find("\n")
-        sendungsNummer      = rightHalfText[:newLinePos]
-
-        # Create a destination page
-        destpage = writer.add_blank_page(width=PaperSize.A4.width, height=PaperSize.A4.height)
-
-        # Crop pages
-        pageAdress.cropbox  = RectangleObject((0, (PaperSize.A4.height/2 + 20), PaperSize.A4.width, PaperSize.A4.height))
-        pageCN.cropbox      = RectangleObject((0, (PaperSize.A4.height/2 + 20), PaperSize.A4.width, PaperSize.A4.height))
-
-        # Merge pages down into destination
-        destpage.merge_transformed_page(
-                    pageAdress,
-                    Transformation().translate(
-                        0,
-                        0,
-                    ),
-                )
-        destpage.merge_transformed_page(
-                    pageCN,
-                    Transformation().translate(
-                        0,
-                        -PaperSize.A4.height/2+20,
-                    ),
-                )
-
-        # Annotate current date into CN field
-        annotation = FreeText(
-            text=today,
-            rect=(500, 50, 200, 100),
-            font_color="000000",
-            border_color=None,
-            background_color=None
-        )
-        writer.add_annotation(page_number=currentPage, annotation=annotation)
-
-        # Print successful recipient + Sendungsnummer
-        print(recipient + " - (" + sendungsNummer + ")")
-
-        # Append reportfile
-        reportFile = output_files + ".csv"
-        with open(reportFile, 'a') as rf:
-            rf.write(recipient)
-            rf.write(";")
-            rf.write(sendungsNummer)
-            rf.write(";\n")
-
-        currentPage = currentPage + 1
-
-    ### End looping through international labels
-
-    
-
-    # Loop through national labels
-    currentPage = 0
-    for inputFile in national_file_path_list:
-
-        # Create and load readers/writers
-        reader = PdfReader(inputFile)
-
-        # Get recipient name from filename
-        inputFileSplit = os.path.basename(inputFile).split("_")
-        recipient = inputFileSplit[2] + " " + inputFileSplit[3].split(".")[0]
-
-        # Collect pages
-        pageAdress  = reader.pages[0]
-
-        # Find tracking number in pdf text
-        extractedText       = pageAdress.extract_text((0, 90))
-        sendungsNummerPos   = extractedText.find("Sendungsnr.:")
-        rightHalfText       = extractedText[sendungsNummerPos+13:]
-        newLinePos          = rightHalfText.find("\n")
-        sendungsNummer      = rightHalfText[:newLinePos]
-
-        # Crop page
-        pageAdress.cropbox  = RectangleObject((0, (PaperSize.A4.height/2 + 20), PaperSize.A4.width, PaperSize.A4.height))
-
-        # On even pages (starting with 0):
-        if (currentPage % 2) == 0:
-            # Create a new destination page
-            destpage = writer.add_blank_page(width=PaperSize.A4.width, height=PaperSize.A4.height)
-            # Merge page into upper part of dest page
-            destpage.merge_transformed_page(
-                    pageAdress,
-                    Transformation().translate(
-                        0,
-                        0,
-                    ),
-                )
+    # Loop through the page ranges
+    for pagerange in range(2):
+        # Loop through the pages of the range
+        for page in range(pageranges[pagerange][0], pageranges[pagerange][1]):
+            inpPage = reader.pages[page-1]
+            # Loop through the 4 boxes where a card might be
+            for card in range(4):
+                # pagerange contains the number of the range we are currently reading
+                # page is the actual page number of the current page we're looking at
+                # card is the card slot number on the page we are looking at
+                # CROPS[pagerange][card] should return the tuble of our current card cropbox
                 
-        # On uneven pages:
-        else:
-            # Merge page into lower part of dest page
-            destpage.merge_transformed_page(
-                    pageAdress,
-                    Transformation().translate(
-                        0,
-                        -PaperSize.A4.height/2,
-                    ),
-                )
+                # Read in single card with cropbox
+                cardPage = deepcopy(inpPage)
+                cardPage.cropbox = RectangleObject(CROPS[pagerange][card])
 
-        # Print successful recipient + Sendungsnummer
-        print(recipient + " - (" + sendungsNummer + ")")
+                # Rotate horizontal pages to be printable
+                if pagerange == 0:
+                    # horizontal pages
+                    cardPage.rotate(-90)
 
-        # Append reportfile
-        reportFile = output_files + ".csv"
-        with open(reportFile, 'a') as rf:
-            rf.write(recipient)
-            rf.write(";")
-            rf.write(sendungsNummer)
-            rf.write(";\n")
+                # Add padding
 
-        currentPage = currentPage + 1
+                # Write single card into destination apge
+                writer.add_page(cardPage)
+                
 
-    ### End looping through national labels
 
-    # Write resulting PDF
-    outputname = output_files + ".pdf"
-    with open(outputname, "wb") as op:
-        writer.write(op)
+    # Prepare output directory
+    cwd = os.path.dirname(input_path)
+    dirname = os.path.splitext(os.path.basename(input_path))[0]
+    dirpath = os.path.join(cwd, dirname)
+    if not os.path.isdir(dirpath):
+        os.mkdir(dirpath)
+
+    # Output file(s)
+    if output_format == "png":
+        print("png output not yet implemented, sorgy")
+        sys.exit()
+    elif output_format == "pdf":
+        # Write resulting PDF
+        outputname = os.path.join(dirpath, "output.pdf");
+        with open(outputname, "wb") as op:
+            writer.write(op)
 
     print("---")
-    print("All files spliced")
+    print("All cards output")
     print("---")
 
 #############################################################################
 ##                               main()                                    ##
 #############################################################################
 def main():
-    print("--------------------")
+
+    print("-----------------------")
     print("--Starting kt3extract--")
-    print("--------------------")
+    print("-----------------------")
 
     # Set command line arguments
     argset()
 
-    # Read in file list
-    file_path_list = read_file_list(input_path)
-
-    # Check if files were found
-    if not file_path_list:
-        print("No valid files found at input_path, exiting")
-        sys.exit()
-
-    # Output file list
-    print("Found the following files: ")
-    for file in file_path_list:
-        print(file)
-
-    # Sanitize file list
-    for file in file_path_list:
-        if file == output_files + ".pdf":
-            file_path_list.remove(file)
-
+    # Output recognized args
+    print("Using input path:")
+    print(input_path)
+    print("Using output format:")
+    print(output_format)
     print("---")
-    
-    # Output file list after sanitizing
-    print("File list after sanitizing: ")
-    for file in file_path_list:
-        print(file)
-
+    print("Assuming horizontal page range:")
+    print(horizontal_range)
+    print("Assuming vertical page range:")
+    print(vertical_range)
     print("---")
 
-    # Create spliced file
-    splice_files(file_path_list, output_files)
+    read_file()
 
 
 #############################################################################

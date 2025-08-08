@@ -33,19 +33,20 @@ The free PDFs always start with a few pages of unit rule datacards, followed by 
 
 All arguments are required.
 
-- `-h` / `-horizontal`: Range of pages where horizontal datacards are situated. `-h "1-3"`
-- `-v` / `-vertical`: Range of pages where vertical datacards are situated. `-h "4-5"`
-- `-o` / `-output`: Format of output files. Allowed formats: `pdf`, `png`
-- `-i` / `-input`: Path to your team's PDF file. `/path/to/killteam.pdf`
+- `-h` / `--horizontal`: Range of pages where horizontal datacards are situated. `-h "1-3"`
+- `-v` / `--vertical`: Range of pages where vertical datacards are situated. `-h "4-5"`
+- `-o` / `--output`: Format of output files. Allowed formats: `pdf`, `png`
+- `-i` / `--input`: Path to your team's PDF file. `/path/to/killteam.pdf`
 
 ## Todo
 
-- [ ] Plausibility check input parameters, testing for range format
-- [ ] Plausibility check input path leads to a PDF
-- [ ] Read in PDF, splitting into two page stacks for horizontal and vertical pages
+- [x] Plausibility check input parameters, testing for range format
+- [x] Plausibility check input path leads to a PDF
+- [x] Read in PDF, splitting into two page stacks for horizontal and vertical pages
 - [ ] Cut and export each page stack
+- [x] Export as stacked PDF
+- [ ] Add optional padding parameter
 - [ ] Export as PNG
-- [ ] Export as stacked PDF
 
 ## Donations
 
