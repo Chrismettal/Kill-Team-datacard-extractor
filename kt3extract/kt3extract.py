@@ -163,7 +163,7 @@ def read_file():
     # Loop through the page ranges
     for pagerange in range(2):
         # Loop through the pages of the range
-        for page in range(pageranges[pagerange][0], pageranges[pagerange][1]):
+        for page in range(pageranges[pagerange][0], pageranges[pagerange][1]+1):
             inpPage = reader.pages[page-1]
             # Loop through the 4 boxes where a card might be
             for card in range(4):
