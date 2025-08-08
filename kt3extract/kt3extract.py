@@ -25,9 +25,7 @@ padding: float
 #############################################################################
 ##                           Global constants                              ##
 #############################################################################
-CARDHEIGHT  = 340.1575
-CARDWIDTH   = 198.4252
-CROPS       = [
+CROPS = [
     [
     (127, 620, 468, 817), # Horizontal Line 1
     (127, 421, 468, 618), # Horizontal Line 2
@@ -35,10 +33,11 @@ CROPS       = [
     (127, 24, 468, 221)  # Horizontal Line 4
     ],
     [
-    (50, 50, 400, 400), # Vertical Top Left
-    (50, 50, 400, 400), # Vertical Top Right
-    (50, 50, 400, 400), # Vertical Bottom Left
-    (50, 50, 400, 400)  # Vertical Bottom Right
+    (100, 422, 297, 763), # Vertical Top Left
+    (299, 422, 495, 763), # Vertical Top Right
+    (100, 79, 297, 420),  # Vertical Bottom Left
+    (299, 79, 495, 420)   # Vertical Bottom Right
+
     ]
 #   (XBL, ZBL, XTR, ZTR)
 ]
@@ -182,12 +181,24 @@ def read_file():
                 bufferPage.mediabox = bufferPage.cropbox = RectangleObject(CROPS[pagerange][card])
                 bufferPage.merge_page(cardPage)
 
-                # Another deep copy just to be safe
+                # Another deep copy for exact scaling
                 interPage = deepcopy(bufferPage)
+                # if pagerange == 0:
+                #     scale_x = (120 / 25.4 * 72) / interPage.mediabox.width
+                #     scale_y = (70 / 25.4 * 72) / interPage.mediabox.height
+                # else:
+                #     scale_x = (70 / 25.4 * 72) / interPage.mediabox.width
+                #     scale_y = (120 / 25.4 * 72) / interPage.mediabox.height
+                # scaler = Transformation().scale(sx=scale_x, sy=scale_y)
+                # interPage.add_transformation(scaler)
 
                 # Create a padded page and paste our cropped thingy onto it
-                newPage = writer.add_blank_page(width = cardPage.mediabox.width + 2 * padding, height = cardPage.mediabox.height + 2 * padding)
-                newPage.merge_translated_page(interPage, tx= -CROPS[pagerange][card][0] + padding, ty = -CROPS[pagerange][card][1] + padding)
+                paddingPoints = padding / 25.4 * 72
+                if pagerange == 0:
+                    newPage = writer.add_blank_page(width = 120 / 25.4 * 72 + 2 * paddingPoints, height = 70 / 25.4 * 72 + 2 * paddingPoints)
+                else:
+                    newPage = writer.add_blank_page(width = 70 / 25.4 * 72 + 2 * paddingPoints, height = 120 / 25.4 * 72 + 2 * paddingPoints)
+                newPage.merge_translated_page(interPage, tx= -CROPS[pagerange][card][0] + paddingPoints, ty = -CROPS[pagerange][card][1] + paddingPoints)
                 
                 # Rotate horizontal pages so everything is in the same orientation
                 if pagerange == 0:
