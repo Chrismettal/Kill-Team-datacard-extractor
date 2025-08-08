@@ -20,13 +20,13 @@ input_path: str
 output_format: str
 horizontal_range: str
 vertical_range: str
+padding: float
 
 #############################################################################
 ##                           Global constants                              ##
 #############################################################################
 CARDHEIGHT  = 340.1575
 CARDWIDTH   = 198.4252
-PADDING     = 10
 CROPS       = [
     [
     (127, 620, 468, 817), # Horizontal Line 1
@@ -55,6 +55,7 @@ def argset():
     global output_format
     global horizontal_range
     global vertical_range
+    global padding
 
     parser = argparse.ArgumentParser(description=
         "Command line tool to extract Kill Team 3rd edition datacards from free rules downloads")
@@ -102,12 +103,23 @@ def argset():
             """
     )
 
+    # Padding
+    parser.add_argument(
+        '--padding', '-p',
+        default=0,
+        type=int,
+        help="""
+            Amount of padding in mm to add to the cards for printing
+            """
+    )
+
     # Parse args
     args = parser.parse_args()
     input_path  = args.input_path
     output_format = args.output_format
     horizontal_range = args.horizontal
     vertical_range = args.vertical
+    padding = args.padding
 
     # Test for ranges to be valid
     pattern = r'^\d+-\d+$'
@@ -137,9 +149,11 @@ def read_file():
     global output_format
     global horizontal_range
     global vertical_range
+    global padding
 
     # Prepare reader and writer
     reader = PdfReader(input_path)
+    buffer = PdfWriter()
     writer = PdfWriter()
 
     # Get page ranges
@@ -159,21 +173,27 @@ def read_file():
                 # card is the card slot number on the page we are looking at
                 # CROPS[pagerange][card] should return the tuble of our current card cropbox
                 
-                # Read in single card with cropbox
+                # Read in single card with cropping
                 cardPage = deepcopy(inpPage)
-                cardPage.cropbox = RectangleObject(CROPS[pagerange][card])
+                cardPage.mediabox = cardPage.cropbox = RectangleObject(CROPS[pagerange][card])
 
-                # Rotate horizontal pages to be printable
+                # Paste it over to a new card that is also cropped just to discard everything outside of cropping range
+                bufferPage = buffer.add_blank_page(height=cardPage.mediabox.width, width=cardPage.mediabox.height)
+                bufferPage.mediabox = bufferPage.cropbox = RectangleObject(CROPS[pagerange][card])
+                bufferPage.merge_page(cardPage)
+
+                # Another deep copy just to be safe
+                interPage = deepcopy(bufferPage)
+
+                # Create a padded page and paste our cropped thingy onto it
+                newPage = writer.add_blank_page(width = cardPage.mediabox.width + 2 * padding, height = cardPage.mediabox.height + 2 * padding)
+                newPage.merge_translated_page(interPage, tx= -CROPS[pagerange][card][0] + padding, ty = -CROPS[pagerange][card][1] + padding)
+                
+                # Rotate horizontal pages so everything is in the same orientation
                 if pagerange == 0:
                     # horizontal pages
-                    cardPage.rotate(-90)
-
-                # Add padding
-
-                # Write single card into destination apge
-                writer.add_page(cardPage)
+                    newPage.rotate(-90)
                 
-
 
     # Prepare output directory
     cwd = os.path.dirname(input_path)
