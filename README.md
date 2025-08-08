@@ -43,9 +43,10 @@ All arguments are required.
 - [x] Plausibility check input parameters, testing for range format
 - [x] Plausibility check input path leads to a PDF
 - [x] Read in PDF, splitting into two page stacks for horizontal and vertical pages
-- [ ] Cut and export each page stack
+- [x] Cut and export each page stack
 - [x] Export as stacked PDF
-- [ ] Add optional padding parameter
+- [x] Add optional padding parameter
+- [ ] Scale pages to be exactly 70mm x 120mm before padding
 - [ ] Export as PNG
 
 ## Donations
