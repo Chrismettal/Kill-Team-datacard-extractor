@@ -3,6 +3,7 @@ requires = [
     "setuptools>=42",
     "wheel",
 ]
+[project]
 dependencies = [
     "pypdf",
 ]
