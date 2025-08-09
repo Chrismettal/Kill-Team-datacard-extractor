@@ -3,7 +3,6 @@
 [![License: GPLv3](https://img.shields.io/badge/license-GPLv3-red?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0.html)
 [![Shop: Elecrow](https://img.shields.io/badge/shop-Elecrow-blue?style=flat-square)](https://www.elecrow.com/store/Binary-6)
 [![Donations: Coffee](https://img.shields.io/badge/donations-Coffee-brown?style=flat-square)](https://github.com/Chrismettal#donations)
-[![Version](https://img.shields.io/github/v/tag/chrismettal/kt3extract?label=version&style=flat-square)](https://https://github.com/Chrismettal/Kill-Team-datacard-extractor)
 
 This is a script to extract Kill Team 3rd Edition datacards from the free rules PDFs published by Games Workshop.
 
@@ -13,11 +12,18 @@ The free PDFs always start with a few pages of unit rule datacards, followed by 
 
 ## Table of contents <!-- omit in toc -->
 
+- [Installation](#installation)
 - [Usage](#usage)
   - [Arguments](#arguments)
 - [Todo](#todo)
 - [Donations](#donations)
 - [License](#license)
+
+## Installation
+
+This package is published to PyPi, so you can install it with:
+
+`pip install kt3extract`
 
 ## Usage
 
@@ -33,10 +39,11 @@ The free PDFs always start with a few pages of unit rule datacards, followed by 
 
 All arguments are required.
 
-- `-h` / `--horizontal`: Range of pages where horizontal datacards are situated. `-h "1-3"`
-- `-v` / `--vertical`: Range of pages where vertical datacards are situated. `-h "4-5"`
+- `-hr` / `--horizontal`: Range of pages where horizontal datacards are situated. `-hr "1-3"`
+- `-vr` / `--vertical`: Range of pages where vertical datacards are situated. `-vr "4-5"`
 - `-o` / `--output`: Format of output files. Allowed formats: `pdf`, `png`
 - `-i` / `--input`: Path to your team's PDF file. `/path/to/killteam.pdf`
+- `-p` / `--padding`: Padding around the cards in mm
 
 ## Todo
 
@@ -46,7 +53,8 @@ All arguments are required.
 - [x] Cut and export each page stack
 - [x] Export as stacked PDF
 - [x] Add optional padding parameter
-- [ ] Scale pages to be exactly 70mm x 120mm before padding
+- [~] Scale pages to be exactly 70mm x 120mm before padding
+- [x] Publish to PyPi
 - [ ] Export as PNG
 
 ## Donations
