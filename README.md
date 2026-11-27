@@ -33,7 +33,16 @@ This package is published to PyPi, so you can install it with:
   - (Unit cards are pasted as ~4 horizontal pages, while rule cards are pasted as ~6 vertical pages)
 - Execute the script, making sure to set all required arguments
 
-`kt3extract -h "1-3" -v "4-5" -o png -i /path/to/killteam.pdf`
+`kt3extract -hr "1-3" -vr "4-8" -o pdf -i /path/to/killteam.pdf`
+
+Page ranges of the currently published rules PDFs:
+
+| Kill Team | File | `-hr` | `-vr` |
+| --- | --- | --- | --- |
+| Battleclade | `eng_battleclade_online_rules-…` | `1-3` | `4-8` |
+| Kommandos | `eng_17-06_…_kommandos_online_rules-…` | `1-3` | `4-7` |
+| Brood Brothers | `eng_28-10_…_brood_brothers-…` | `1-5` | `6-10` |
+| Raveners | `eng_28-10_…_raveners-…` | `1-2` | `3-7` |
 
 ### Arguments
 
@@ -43,7 +52,16 @@ All arguments are required.
 - `-vr` / `--vertical`: Range of pages where vertical datacards are situated. `-vr "4-5"`
 - `-o` / `--output`: Format of output files. Allowed formats: `pdf`, `png`
 - `-i` / `--input`: Path to your team's PDF file. `/path/to/killteam.pdf`
-- `-p` / `--padding`: Padding around the cards in mm
+- `-p` / `--padding_mm`: Padding around the cards in millimetres, e.g. `-p 3`
+- `-px` / `--padding_px`: Padding around the cards in pixels, e.g. `-px 100`.
+  Converted using 300 pixels per inch.
+
+`--padding_mm` and `--padding_px` are mutually exclusive. Without either, cards are
+output without padding.
+
+The datacards in the Games Workshop PDFs measure 121mm x 70mm. They are scaled
+down to 120mm x 70mm, the size of the card blanks they are printed on, so the
+printed card reaches all four edges of the blank.
 
 ## Todo
 
@@ -53,7 +71,7 @@ All arguments are required.
 - [x] Cut and export each page stack
 - [x] Export as stacked PDF
 - [x] Add optional padding parameter
-- [~] Scale pages to be exactly 70mm x 120mm before padding
+- [x] Scale pages to be exactly 70mm x 120mm before padding
 - [x] Publish to PyPi
 - [ ] Export as PNG
 

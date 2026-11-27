@@ -20,27 +20,40 @@ input_path: str
 output_format: str
 horizontal_range: str
 vertical_range: str
-padding: float
+padding_mm: float
+padding_px: float
 
 #############################################################################
 ##                           Global constants                              ##
 #############################################################################
+# PDF points per millimetre
+MM = 72 / 25.4
+# Physical size we output each card at, in mm.
+# The cards as printed by Games Workshop measure 121mm x 70mm; we scale them
+# down to the 120mm x 70mm blank we cut our own cards from.
+CARD_LONG = 120
+CARD_SHORT = 70
+# Pixels per inch assumed when padding is given in pixels
+PAD_DPI = 300
+
 CROPS = [
     [
-    (127, 620, 468, 817), # Horizontal Line 1
-    (127, 421, 468, 618), # Horizontal Line 2
-    (127, 223, 468, 420), # Horizontal Line 3
-    (127, 24, 468, 221)  # Horizontal Line 4
+    (126.141, 619.016, 469.134, 817.441), # Horizontal Line 1
+    (126.141, 420.591, 469.134, 619.016), # Horizontal Line 2
+    (126.141, 222.166, 469.134, 420.591), # Horizontal Line 3
+    (126.141, 23.740, 469.134, 222.165)   # Horizontal Line 4
     ],
     [
-    (100, 422, 297, 763), # Vertical Top Left
-    (299, 422, 495, 763), # Vertical Top Right
-    (100, 79, 297, 420),  # Vertical Bottom Left
-    (299, 79, 495, 420)   # Vertical Bottom Right
-
-    ]
-#   (XBL, ZBL, XTR, ZTR)
+    (99.212, 420.945, 297.638, 763.937),  # Vertical Top Left
+    (297.638, 420.945, 496.063, 763.937), # Vertical Top Right
+    (99.212, 77.953, 297.638, 420.945),   # Vertical Bottom Left
+    (297.638, 77.953, 496.063, 420.945)   # Vertical Bottom Right
+    ],
+    #   (XBL, ZBL, XTR, ZTR)
 ]
+# These are the exact clipping paths Games Workshop draws each card into,
+# measured from the rules PDFs themselves. Each card is 342.993pt x 198.425pt,
+# which is exactly 121mm x 70mm.
 
 #############################################################################
 ##                               Helpers                                   ##
@@ -54,7 +67,8 @@ def argset():
     global output_format
     global horizontal_range
     global vertical_range
-    global padding
+    global padding_mm
+    global padding_px
 
     parser = argparse.ArgumentParser(description=
         "Command line tool to extract Kill Team 3rd edition datacards from free rules downloads")
@@ -102,14 +116,26 @@ def argset():
             """
     )
 
-    # Padding
-    parser.add_argument(
-        '--padding', '-p',
+    # Padding, either in millimetres or in pixels, never both
+    padding_group = parser.add_mutually_exclusive_group()
+
+    padding_group.add_argument(
+        '--padding_mm', '-p',
         default=0,
-        type=int,
+        type=float,
         help="""
-            Amount of padding in mm to add to the cards for printing
+            Amount of padding in mm to add around the cards for printing
             """
+    )
+
+    padding_group.add_argument(
+        '--padding_px', '-px',
+        default=0,
+        type=float,
+        help="""
+            Amount of padding in pixels to add around the cards for printing.
+            Converted using %d pixels per inch.
+            """ % PAD_DPI
     )
 
     # Parse args
@@ -118,7 +144,8 @@ def argset():
     output_format = args.output_format
     horizontal_range = args.horizontal
     vertical_range = args.vertical
-    padding = args.padding
+    padding_mm = args.padding_mm
+    padding_px = args.padding_px
 
     # Test for ranges to be valid
     pattern = r'^\d+-\d+$'
@@ -139,6 +166,20 @@ def argset():
         print("File format chosen does not match either pdf or png")
         sys.exit()
 
+    # Test if the padding is plausible
+    if padding_mm < 0 or padding_px < 0:
+        print("Padding can not be negative")
+        sys.exit()
+
+
+def padding_points():
+    """
+    Resolves the requested padding into PDF points
+    """
+    if padding_px:
+        return padding_px / PAD_DPI * 72
+    return padding_mm * MM
+
 
 def read_file():
     """
@@ -148,12 +189,14 @@ def read_file():
     global output_format
     global horizontal_range
     global vertical_range
-    global padding
 
     # Prepare reader and writer
     reader = PdfReader(input_path)
     buffer = PdfWriter()
     writer = PdfWriter()
+
+    # Resolve padding once
+    paddingPoints = padding_points()
 
     # Get page ranges
     horirange =  [int(num) for num in horizontal_range.split('-')]
@@ -162,11 +205,23 @@ def read_file():
 
     # Loop through the page ranges
     for pagerange in range(2):
+        # The physical size of the card we output, in points
+        if pagerange == 0:
+            cardWidth = CARD_LONG * MM
+            cardHeight = CARD_SHORT * MM
+        else:
+            cardWidth = CARD_SHORT * MM
+            cardHeight = CARD_LONG * MM
         # Loop through the pages of the range
         for page in range(pageranges[pagerange][0], pageranges[pagerange][1]+1):
             inpPage = reader.pages[page-1]
             # Loop through the 4 boxes where a card might be
             for card in range(4):
+                crop = CROPS[pagerange][card]
+                cropXBL, cropZBL, cropXTR, cropZTR = crop
+                cropWidth = cropXTR - cropXBL
+                cropHeight = cropZTR - cropZBL
+
                 # pagerange contains the number of the range we are currently reading
                 # page is the actual page number of the current page we're looking at
                 # card is the card slot number on the page we are looking at
@@ -174,37 +229,29 @@ def read_file():
                 
                 # Read in single card with cropping
                 cardPage = deepcopy(inpPage)
-                cardPage.mediabox = cardPage.cropbox = RectangleObject(CROPS[pagerange][card])
+                cardPage.mediabox = cardPage.cropbox = RectangleObject(crop)
 
                 # Paste it over to a new card that is also cropped just to discard everything outside of cropping range
-                bufferPage = buffer.add_blank_page(height=cardPage.mediabox.width, width=cardPage.mediabox.height)
-                bufferPage.mediabox = bufferPage.cropbox = RectangleObject(CROPS[pagerange][card])
+                bufferPage = buffer.add_blank_page(width = cropWidth, height = cropHeight)
+                bufferPage.mediabox = bufferPage.cropbox = RectangleObject(crop)
                 bufferPage.merge_page(cardPage)
 
                 # Another deep copy for exact scaling
                 interPage = deepcopy(bufferPage)
-                # if pagerange == 0:
-                #     scale_x = (120 / 25.4 * 72) / interPage.mediabox.width
-                #     scale_y = (70 / 25.4 * 72) / interPage.mediabox.height
-                # else:
-                #     scale_x = (70 / 25.4 * 72) / interPage.mediabox.width
-                #     scale_y = (120 / 25.4 * 72) / interPage.mediabox.height
-                # scaler = Transformation().scale(sx=scale_x, sy=scale_y)
-                # interPage.add_transformation(scaler)
 
-                # Create a padded page and paste our cropped thingy onto it
-                paddingPoints = padding / 25.4 * 72
-                if pagerange == 0:
-                    newPage = writer.add_blank_page(width = 120 / 25.4 * 72 + 2 * paddingPoints, height = 70 / 25.4 * 72 + 2 * paddingPoints)
-                else:
-                    newPage = writer.add_blank_page(width = 70 / 25.4 * 72 + 2 * paddingPoints, height = 120 / 25.4 * 72 + 2 * paddingPoints)
-                newPage.merge_translated_page(interPage, tx= -CROPS[pagerange][card][0] + paddingPoints, ty = -CROPS[pagerange][card][1] + paddingPoints)
-                
+                # Create a padded page and paste our cropped thingy onto it,
+                # scaled so the card itself covers exactly cardWidth x cardHeight
+                newPage = writer.add_blank_page(width = cardWidth + 2 * paddingPoints, height = cardHeight + 2 * paddingPoints)
+                placement = Transformation()
+                placement = placement.translate(-cropXBL, -cropZBL)
+                placement = placement.scale(sx = cardWidth / cropWidth, sy = cardHeight / cropHeight)
+                placement = placement.translate(paddingPoints, paddingPoints)
+                newPage.merge_transformed_page(interPage, placement)
+
                 # Rotate horizontal pages so everything is in the same orientation
                 if pagerange == 0:
                     # horizontal pages
                     newPage.rotate(-90)
-                
 
     # Prepare output directory
     cwd = os.path.dirname(input_path)
@@ -250,6 +297,12 @@ def main():
     print("Assuming vertical page range:")
     print(vertical_range)
     print("---")
+    if padding_px:
+        print("Using padding:")
+        print("%g px (%.2f mm)" % (padding_px, padding_px / PAD_DPI * 25.4))
+    else:
+        print("Using padding:")
+        print("%g mm" % padding_mm)
 
     read_file()
 
