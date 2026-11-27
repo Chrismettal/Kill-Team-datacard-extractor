@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-11-27
+
 ### Fixed
 - Card crops now use the exact clipping paths Games Workshop draws its cards into
   (measured from the rules PDFs), instead of rounded approximations that were
