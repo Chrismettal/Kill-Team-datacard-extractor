@@ -63,6 +63,13 @@ The datacards in the Games Workshop PDFs measure 121mm x 70mm. They are scaled
 down to 120mm x 70mm, the size of the card blanks they are printed on, so the
 printed card reaches all four edges of the blank.
 
+Games Workshop draws a dashed stitch line along the card borders, for cutting the
+cards out by hand. It is 0.5pt wide and centred on the border, so 0.088mm of it
+lies inside the card. Every crop is therefore inset by 0.5mm on all four sides,
+which removes the stitch line with 0.4mm to spare. The remaining 119.9mm x 68.9mm
+of card art is stretched to the full 120mm x 70mm, by 0.08% along the long side
+and 1.6% along the short side.
+
 ## Todo
 
 - [x] Plausibility check input parameters, testing for range format

@@ -13,8 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Output pages are no longer a fixed 120mm x 70mm while the card art is 121mm x
   70mm. That mismatch left an empty strip along the left edge of horizontal
   cards and along the right edge of vertical cards, and clipped the other side.
+- The dashed stitch line Games Workshop draws along the card borders is no longer
+  printed on the cards. It is 0.5pt wide and centred on the border, so 0.088mm
+  of it used to fall inside every card edge.
 
 ### Changed
+- Card crops are inset by 0.5mm on all four sides to keep the stitch line off the
+  cards, which clears it by 0.41mm.
 - Cards are scaled to exactly 120mm x 70mm, the size of the card blanks they are
   printed on, so the card art reaches all four edges of the output page.
 - Padding is now given either in millimetres (`-p` / `--padding_mm`) or in

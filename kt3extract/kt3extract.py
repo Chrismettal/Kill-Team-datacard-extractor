@@ -35,6 +35,11 @@ CARD_LONG = 120
 CARD_SHORT = 70
 # Pixels per inch assumed when padding is given in pixels
 PAD_DPI = 300
+# Games Workshop draws a dashed stitch line for cutting the cards out by hand.
+# It sits exactly on the card borders, is 0.5pt wide and centred on them, so
+# 0.088mm of it lies inside every card. We cut this many millimetres off every
+# side of every crop to get rid of it, which clears it by 0.41mm.
+CROP_INSET = 0.5
 
 CROPS = [
     [
@@ -197,6 +202,9 @@ def read_file():
 
     # Resolve padding once
     paddingPoints = padding_points()
+    # Cut in on every side so the stitch line Games Workshop draws between two
+    # neighbouring cards does not end up on the card
+    inset = CROP_INSET * MM
 
     # Get page ranges
     horirange =  [int(num) for num in horizontal_range.split('-')]
@@ -218,9 +226,11 @@ def read_file():
             # Loop through the 4 boxes where a card might be
             for card in range(4):
                 crop = CROPS[pagerange][card]
-                cropXBL, cropZBL, cropXTR, cropZTR = crop
+                cropXBL, cropZBL = crop[0] + inset, crop[1] + inset
+                cropXTR, cropZTR = crop[2] - inset, crop[3] - inset
                 cropWidth = cropXTR - cropXBL
                 cropHeight = cropZTR - cropZBL
+                cropRect = (cropXBL, cropZBL, cropXTR, cropZTR)
 
                 # pagerange contains the number of the range we are currently reading
                 # page is the actual page number of the current page we're looking at
@@ -229,11 +239,11 @@ def read_file():
                 
                 # Read in single card with cropping
                 cardPage = deepcopy(inpPage)
-                cardPage.mediabox = cardPage.cropbox = RectangleObject(crop)
+                cardPage.mediabox = cardPage.cropbox = RectangleObject(cropRect)
 
                 # Paste it over to a new card that is also cropped just to discard everything outside of cropping range
                 bufferPage = buffer.add_blank_page(width = cropWidth, height = cropHeight)
-                bufferPage.mediabox = bufferPage.cropbox = RectangleObject(crop)
+                bufferPage.mediabox = bufferPage.cropbox = RectangleObject(cropRect)
                 bufferPage.merge_page(cardPage)
 
                 # Another deep copy for exact scaling
